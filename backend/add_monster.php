@@ -1,57 +1,36 @@
 <?php
-declare(strict_types=1);
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: POST");
 
-require_once "hauconnect.php";
+require_once 'hauconnect.php';
+
+$data = json_decode(file_get_contents("php://input"));
+
+if (empty($data->monster_name) || empty($data->monster_type)) {
+    echo json_encode(["success" => false, "message" => "Incomplete data. Name and Type are required."]);
+    exit;
+}
 
 try {
-    requireMethod('POST');
+    $query = "INSERT INTO monsterstbl (monster_name, monster_type, spawn_latitude, spawn_longitude, spawn_radius_meters, picture_url)
+              VALUES (:monster_name, :monster_type, :spawn_latitude, :spawn_longitude, :spawn_radius_meters, :picture_url)";
 
-    $monsterName = requestValue(['monster_name', 'name', 'monsterName'], true);
-    $monsterType = requestValue(['monster_type', 'type', 'monsterType'], true);
-    $spawnLatitude = requestFloat(['spawn_latitude', 'latitude', 'lat', 'spawn_lat'], true);
-    $spawnLongitude = requestFloat(['spawn_longitude', 'longitude', 'lng', 'long', 'spawn_lng'], true);
-    $spawnRadius = requestFloat(['spawn_radius_meters', 'spawn_radius', 'radius', 'radius_meters'], true);
-    $pictureUrl = normalizePictureUrl(
-        requestValue(
-            ['picture_url', 'image_url', 'picture', 'image', 'monster_image_url'],
-            false,
-            true
-        )
-    );
+    $stmt = $conn->prepare($query);
 
-    $pdo = createDatabaseConnection();
-    $statement = $pdo->prepare(
-        'INSERT INTO monsterstbl (
-            monster_name,
-            monster_type,
-            spawn_latitude,
-            spawn_longitude,
-            spawn_radius_meters,
-            picture_url
-        ) VALUES (
-            :monster_name,
-            :monster_type,
-            :spawn_latitude,
-            :spawn_longitude,
-            :spawn_radius_meters,
-            :picture_url
-        )'
-    );
+    $stmt->bindParam(':monster_name', $data->monster_name);
+    $stmt->bindParam(':monster_type', $data->monster_type);
+    $stmt->bindParam(':spawn_latitude', $data->spawn_latitude);
+    $stmt->bindParam(':spawn_longitude', $data->spawn_longitude);
+    $stmt->bindParam(':spawn_radius_meters', $data->spawn_radius_meters);
+    $stmt->bindParam(':picture_url', $data->picture_url);
 
-    $statement->execute([
-        ':monster_name' => $monsterName,
-        ':monster_type' => $monsterType,
-        ':spawn_latitude' => $spawnLatitude,
-        ':spawn_longitude' => $spawnLongitude,
-        ':spawn_radius_meters' => $spawnRadius,
-        ':picture_url' => $pictureUrl,
-    ]);
-
-    jsonResponse(201, [
-        'success' => true,
-        'message' => 'Monster added successfully',
-        'monster_id' => (int) $pdo->lastInsertId(),
-    ]);
-} catch (Throwable $exception) {
-    handleServerException($exception);
+    if ($stmt->execute()) {
+        echo json_encode(["success" => true, "message" => "Monster added successfully."]);
+    } else {
+        echo json_encode(["success" => false, "message" => "Failed to add monster."]);
+    }
+} catch (PDOException $e) {
+    echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
 }
+?>

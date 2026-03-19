@@ -1,64 +1,46 @@
 <?php
-declare(strict_types=1);
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: POST");
 
-require_once "hauconnect.php";
+require_once 'hauconnect.php';
+
+// Read the raw JSON data sent by Flutter
+$data = json_decode(file_get_contents("php://input"));
+
+// Check if the required data is present
+if (!isset($data->monster_id) || empty($data->monster_name) || empty($data->monster_type)) {
+    echo json_encode(["success" => false, "message" => "Incomplete data. Name, Type, and ID are required."]);
+    exit;
+}
 
 try {
-    requireMethod('POST');
+    $query = "UPDATE monsterstbl SET
+                monster_name = :monster_name,
+                monster_type = :monster_type,
+                spawn_latitude = :spawn_latitude,
+                spawn_longitude = :spawn_longitude,
+                spawn_radius_meters = :spawn_radius_meters,
+                picture_url = :picture_url
+              WHERE monster_id = :monster_id";
 
-    $monsterId = requestInt(['monster_id', 'id', 'monsterId'], true);
-    $monsterName = requestValue(['monster_name', 'name', 'monsterName'], true);
-    $monsterType = requestValue(['monster_type', 'type', 'monsterType'], true);
-    $spawnLatitude = requestFloat(['spawn_latitude', 'latitude', 'lat', 'spawn_lat'], true);
-    $spawnLongitude = requestFloat(['spawn_longitude', 'longitude', 'lng', 'long', 'spawn_lng'], true);
-    $spawnRadius = requestFloat(['spawn_radius_meters', 'spawn_radius', 'radius', 'radius_meters'], true);
-    $pictureUrl = normalizePictureUrl(
-        requestValue(
-            ['picture_url', 'image_url', 'picture', 'image', 'monster_image_url'],
-            false,
-            true
-        )
-    );
+    $stmt = $conn->prepare($query);
 
-    $pdo = createDatabaseConnection();
-    $statement = $pdo->prepare(
-        'UPDATE monsterstbl
-         SET
-            monster_name = :monster_name,
-            monster_type = :monster_type,
-            spawn_latitude = :spawn_latitude,
-            spawn_longitude = :spawn_longitude,
-            spawn_radius_meters = :spawn_radius_meters,
-            picture_url = :picture_url
-         WHERE monster_id = :monster_id'
-    );
+    // Bind the JSON data to the SQL query safely
+    $stmt->bindParam(':monster_name', $data->monster_name);
+    $stmt->bindParam(':monster_type', $data->monster_type);
+    $stmt->bindParam(':spawn_latitude', $data->spawn_latitude);
+    $stmt->bindParam(':spawn_longitude', $data->spawn_longitude);
+    $stmt->bindParam(':spawn_radius_meters', $data->spawn_radius_meters);
+    $stmt->bindParam(':picture_url', $data->picture_url);
+    $stmt->bindParam(':monster_id', $data->monster_id);
 
-    $statement->execute([
-        ':monster_id' => $monsterId,
-        ':monster_name' => $monsterName,
-        ':monster_type' => $monsterType,
-        ':spawn_latitude' => $spawnLatitude,
-        ':spawn_longitude' => $spawnLongitude,
-        ':spawn_radius_meters' => $spawnRadius,
-        ':picture_url' => $pictureUrl,
-    ]);
-
-    if ($statement->rowCount() === 0) {
-        $checkStatement = $pdo->prepare('SELECT monster_id FROM monsterstbl WHERE monster_id = :monster_id');
-        $checkStatement->execute([':monster_id' => $monsterId]);
-
-        if ($checkStatement->fetchColumn() === false) {
-            jsonResponse(404, [
-                'success' => false,
-                'message' => 'Monster not found',
-            ]);
-        }
+    if ($stmt->execute()) {
+        echo json_encode(["success" => true, "message" => "Monster updated successfully."]);
+    } else {
+        echo json_encode(["success" => false, "message" => "Failed to update monster."]);
     }
-
-    jsonResponse(200, [
-        'success' => true,
-        'message' => 'Monster updated successfully',
-    ]);
-} catch (Throwable $exception) {
-    handleServerException($exception);
+} catch (PDOException $e) {
+    echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
 }
+?>

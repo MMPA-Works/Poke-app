@@ -1,60 +1,73 @@
 <?php
-declare(strict_types=1);
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: POST");
 
-require_once __DIR__ . '/config/bootstrap.php';
+// We still include hauconnect to maintain API consistency
+require_once 'hauconnect.php';
 
 try {
-    requireMethod('POST');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(["success" => false, "message" => "Invalid request method."]);
+        exit;
+    }
 
     if (!isset($_FILES['image'])) {
-        jsonResponse(400, [
-            'success' => false,
-            'message' => 'No image uploaded',
-        ]);
+        echo json_encode(["success" => false, "message" => "No image uploaded."]);
+        exit;
     }
 
     $upload = $_FILES['image'];
-    if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        jsonResponse(400, [
-            'success' => false,
-            'message' => 'Image upload failed',
-        ]);
+    if ($upload['error'] !== UPLOAD_ERR_OK) {
+        echo json_encode(["success" => false, "message" => "Image upload failed with error code: " . $upload['error']]);
+        exit;
     }
 
-    $temporaryPath = (string) ($upload['tmp_name'] ?? '');
-    $originalName = (string) ($upload['name'] ?? '');
+    $temporaryPath = $upload['tmp_name'];
+    $originalName = $upload['name'];
 
     $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
     $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
 
-    if (!in_array($extension, $allowedExtensions, true)) {
-        jsonResponse(400, [
-            'success' => false,
-            'message' => 'Only JPG, JPEG, PNG, and WEBP images are allowed',
-        ]);
+    if (!in_array($extension, $allowedExtensions)) {
+        echo json_encode(["success" => false, "message" => "Only JPG, JPEG, PNG, and WEBP images are allowed."]);
+        exit;
     }
 
     $uploadDirectory = __DIR__ . '/uploads';
-    if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0777, true) && !is_dir($uploadDirectory)) {
-        throw new RuntimeException('Unable to create uploads directory');
+    if (!is_dir($uploadDirectory)) {
+        // Create the directory if it does not exist
+        mkdir($uploadDirectory, 0777, true);
     }
 
-    $fileName = sprintf(
-        'monster_%s.%s',
-        str_replace('.', '', uniqid('', true)),
-        $extension
-    );
+    $fileName = 'monster_' . uniqid() . '.' . $extension;
     $destinationPath = $uploadDirectory . '/' . $fileName;
 
     if (!move_uploaded_file($temporaryPath, $destinationPath)) {
-        throw new RuntimeException('Unable to store uploaded image');
+        echo json_encode(["success" => false, "message" => "Unable to store uploaded image on the server."]);
+        exit;
     }
 
-    jsonResponse(200, [
-        'success' => true,
-        'message' => 'Image uploaded successfully',
-        'image_url' => currentBaseUrl() . '/uploads/' . $fileName,
+    // Build the full URL to the image automatically
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+    $host = $_SERVER['HTTP_HOST'];
+    $scriptDir = dirname($_SERVER['PHP_SELF']);
+    
+    // Ensure the script directory does not end with a slash
+    $scriptDir = rtrim($scriptDir, '/');
+    
+    $imageUrl = $protocol . "://" . $host . $scriptDir . '/uploads/' . $fileName;
+
+    echo json_encode([
+        "success" => true,
+        "message" => "Image uploaded successfully.",
+        "image_url" => $imageUrl
     ]);
-} catch (Throwable $exception) {
-    handleServerException($exception);
+
+} catch (Exception $e) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Server error: " . $e->getMessage()
+    ]);
 }
+?>

@@ -1,8 +1,8 @@
 <?php
 $host = "localhost";
 $dbname = "haumonstersDB";
-$username = "dbmanager";
-$password = "6adetp@ssw0rd20221";
+$username = "root";
+$password = "";
 
 try {
     $conn = new PDO(

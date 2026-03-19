@@ -1,28 +1,28 @@
 <?php
-declare(strict_types=1);
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: POST");
 
-require_once "hauconnect.php";
+require_once 'hauconnect.php';
+
+$data = json_decode(file_get_contents("php://input"));
+
+if (!isset($data->monster_id)) {
+    echo json_encode(["success" => false, "message" => "Monster ID is required."]);
+    exit;
+}
 
 try {
-    requireMethod('POST');
+    $query = "DELETE FROM monsterstbl WHERE monster_id = :monster_id";
+    $stmt = $conn->prepare($query);
+    $stmt->bindParam(':monster_id', $data->monster_id);
 
-    $monsterId = requestInt(['monster_id', 'id', 'monsterId'], true);
-
-    $pdo = createDatabaseConnection();
-    $statement = $pdo->prepare('DELETE FROM monsterstbl WHERE monster_id = :monster_id');
-    $statement->execute([':monster_id' => $monsterId]);
-
-    if ($statement->rowCount() === 0) {
-        jsonResponse(404, [
-            'success' => false,
-            'message' => 'Monster not found',
-        ]);
+    if ($stmt->execute()) {
+        echo json_encode(["success" => true, "message" => "Monster deleted successfully."]);
+    } else {
+        echo json_encode(["success" => false, "message" => "Failed to delete monster."]);
     }
-
-    jsonResponse(200, [
-        'success' => true,
-        'message' => 'Monster deleted successfully',
-    ]);
-} catch (Throwable $exception) {
-    handleServerException($exception);
+} catch (PDOException $e) {
+    echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
 }
+?>

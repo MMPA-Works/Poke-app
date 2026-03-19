@@ -4,7 +4,7 @@ class AppConfig {
   static String get apiBaseUrl {
     const rawBaseUrl = String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://192.168.0.221/haumonsters_api',
+      defaultValue: 'http://10.0.2.2/haumonsters_api',
     );
 
     return rawBaseUrl.endsWith('/')
