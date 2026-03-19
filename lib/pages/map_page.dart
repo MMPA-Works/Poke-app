@@ -15,8 +15,6 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   static const LatLng _fallbackCenter = LatLng(14.5995, 120.9842);
 
-  final _apiService = ApiService();
-
   List<MonsterModel> _monsters = const [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -34,7 +32,8 @@ class _MapPageState extends State<MapPage> {
     });
 
     try {
-      final monsters = await _apiService.getMonsters();
+      // Changed to use the static method
+      final monsters = await ApiService.getMonsters();
       if (!mounted) {
         return;
       }

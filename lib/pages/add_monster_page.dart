@@ -6,7 +6,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../models/monster_model.dart';
 import '../services/api_service.dart';
 import '../widgets/monster_image_preview.dart';
 
@@ -25,7 +24,6 @@ class _AddMonsterPageState extends State<AddMonsterPage> {
   final _typeController = TextEditingController();
   final _radiusController = TextEditingController(text: '100');
   final _mapController = MapController();
-  final _apiService = ApiService();
   final _imagePicker = ImagePicker();
 
   LatLng _mapCenter = _fallbackCenter;
@@ -164,11 +162,10 @@ class _AddMonsterPageState extends State<AddMonsterPage> {
     try {
       String? pictureUrl;
       if (_selectedImage != null) {
-        pictureUrl = await _apiService.uploadMonsterImage(_selectedImage!);
+        pictureUrl = await ApiService.uploadMonsterImage(_selectedImage!);
       }
 
-      final monster = MonsterModel(
-        monsterId: 0,
+      await ApiService.addMonster(
         monsterName: _nameController.text.trim(),
         monsterType: _typeController.text.trim(),
         spawnLatitude: _selectedPoint!.latitude,
@@ -176,8 +173,6 @@ class _AddMonsterPageState extends State<AddMonsterPage> {
         spawnRadiusMeters: _radiusValue,
         pictureUrl: pictureUrl,
       );
-
-      await _apiService.addMonster(monster);
 
       if (!mounted) {
         return;

@@ -6,33 +6,52 @@ import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 import '../models/monster_model.dart';
+// Note: You will need to create this model file if you have not already.
+import '../models/player_ranking_model.dart';
 
 class ApiService {
-  ApiService({http.Client? client}) : _client = client ?? http.Client();
-
+  static final http.Client _client = http.Client();
   static const Duration _timeout = Duration(seconds: 20);
 
-  final http.Client _client;
-
+  // Keeping your robust AppConfig setup
   static String get baseUrl => AppConfig.apiBaseUrl;
 
-  Future<List<MonsterModel>> getMonsters() async {
+  static Future<Map<String, dynamic>> addMonster({
+    required String monsterName,
+    required String monsterType,
+    required double spawnLatitude,
+    required double spawnLongitude,
+    required double spawnRadiusMeters,
+    String? pictureUrl,
+  }) async {
+    final jsonMap = await _postJson(
+      endpoint: 'add_monster.php',
+      body: {
+        "monster_name": monsterName,
+        "monster_type": monsterType,
+        "spawn_latitude": spawnLatitude,
+        "spawn_longitude": spawnLongitude,
+        "spawn_radius_meters": spawnRadiusMeters,
+        "picture_url": pictureUrl ?? "",
+      },
+    );
+
+    _throwIfRequestFailed(jsonMap, fallbackMessage: 'Failed to add monster.');
+    return jsonMap;
+  }
+
+  static Future<List<MonsterModel>> getMonsters() async {
     try {
       final response = await _client
           .get(Uri.parse('$baseUrl/get_monsters.php'))
           .timeout(_timeout);
 
       final jsonMap = _decodeResponse(response);
-      _throwIfRequestFailed(
-        jsonMap,
-        fallbackMessage: 'Failed to load monsters.',
-      );
+      _throwIfRequestFailed(jsonMap, fallbackMessage: 'Failed to load monsters.');
 
       final data = jsonMap['data'];
       if (data is! List) {
-        throw const ApiException(
-          'Invalid monster list received from the server.',
-        );
+        throw const ApiException('Invalid monster list received from the server.');
       }
 
       return data
@@ -40,50 +59,49 @@ class ApiService {
           .map((item) => MonsterModel.fromJson(Map<String, dynamic>.from(item)))
           .toList();
     } on TimeoutException {
-      throw const ApiException(
-        'Request timed out while loading monsters. Check your connection.',
-      );
+      throw const ApiException('Request timed out while loading monsters.');
     } on SocketException {
-      throw const ApiException(
-        'Unable to reach the server. Check your internet connection.',
-      );
+      throw const ApiException('Unable to reach the server.');
     }
   }
 
-  Future<void> addMonster(MonsterModel monster) async {
-    final jsonMap = await _postForm(
-      endpoint: 'add_monster.php',
-      body: monster.toApiMap(),
-    );
-
-    _throwIfRequestFailed(jsonMap, fallbackMessage: 'Failed to add monster.');
-  }
-
-  Future<void> updateMonster(MonsterModel monster) async {
-    final jsonMap = await _postForm(
+  static Future<Map<String, dynamic>> updateMonster({
+    required int monsterId,
+    required String monsterName,
+    required String monsterType,
+    required double spawnLatitude,
+    required double spawnLongitude,
+    required double spawnRadiusMeters,
+    String? pictureUrl,
+  }) async {
+    final jsonMap = await _postJson(
       endpoint: 'update_monster.php',
-      body: monster.toApiMap(includeId: true),
+      body: {
+        "monster_id": monsterId,
+        "monster_name": monsterName,
+        "monster_type": monsterType,
+        "spawn_latitude": spawnLatitude,
+        "spawn_longitude": spawnLongitude,
+        "spawn_radius_meters": spawnRadiusMeters,
+        "picture_url": pictureUrl ?? "",
+      },
     );
 
-    _throwIfRequestFailed(
-      jsonMap,
-      fallbackMessage: 'Failed to update monster.',
-    );
+    _throwIfRequestFailed(jsonMap, fallbackMessage: 'Failed to update monster.');
+    return jsonMap;
   }
 
-  Future<void> deleteMonster(int monsterId) async {
-    final jsonMap = await _postForm(
+  static Future<Map<String, dynamic>> deleteMonster({required int monsterId}) async {
+    final jsonMap = await _postJson(
       endpoint: 'delete_monster.php',
-      body: {'monster_id': monsterId.toString()},
+      body: {"monster_id": monsterId},
     );
 
-    _throwIfRequestFailed(
-      jsonMap,
-      fallbackMessage: 'Failed to delete monster.',
-    );
+    _throwIfRequestFailed(jsonMap, fallbackMessage: 'Failed to delete monster.');
+    return jsonMap;
   }
 
-  Future<String> uploadMonsterImage(File imageFile) async {
+  static Future<String> uploadMonsterImage(File imageFile) async {
     if (!await imageFile.exists()) {
       throw const ApiException('Selected image file could not be found.');
     }
@@ -107,8 +125,6 @@ class ApiService {
         'image_url',
         'picture_url',
         'url',
-        'file_url',
-        'path',
       ]);
 
       if (imageUrl == null || imageUrl.isEmpty) {
@@ -117,11 +133,34 @@ class ApiService {
 
       return imageUrl;
     } on TimeoutException {
-      throw const ApiException(
-        'Image upload timed out. Check your connection and try again.',
-      );
+      throw const ApiException('Image upload timed out.');
     } on SocketException {
       throw const ApiException('Unable to reach the server for image upload.');
+    }
+  }
+
+  static Future<List<PlayerRanking>> getPlayerRankings() async {
+    try {
+      final response = await _client
+          .get(Uri.parse('$baseUrl/get_player_rankings.php'))
+          .timeout(_timeout);
+
+      final jsonMap = _decodeResponse(response);
+      _throwIfRequestFailed(jsonMap, fallbackMessage: 'Failed to load rankings.');
+
+      final data = jsonMap['data'];
+      if (data is! List) {
+        throw const ApiException('Invalid ranking list received from the server.');
+      }
+
+      return data
+          .whereType<Map>()
+          .map((item) => PlayerRanking.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } on TimeoutException {
+      throw const ApiException('Request timed out while loading rankings.');
+    } on SocketException {
+      throw const ApiException('Unable to reach the server.');
     }
   }
 
@@ -142,30 +181,33 @@ class ApiService {
     return '$baseUrl/$trimmed';
   }
 
-  Future<Map<String, dynamic>> _postForm({
+  // Changed this helper to send JSON instead of form data
+  static Future<Map<String, dynamic>> _postJson({
     required String endpoint,
-    required Map<String, String> body,
+    required Map<String, dynamic> body,
   }) async {
     try {
       final response = await _client
-          .post(Uri.parse('$baseUrl/$endpoint'), body: body)
+          .post(
+            Uri.parse('$baseUrl/$endpoint'),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode(body),
+          )
           .timeout(_timeout);
       return _decodeResponse(response);
     } on TimeoutException {
-      throw const ApiException(
-        'Request timed out. Check your connection and try again.',
-      );
+      throw const ApiException('Request timed out. Check your connection.');
     } on SocketException {
-      throw const ApiException(
-        'Unable to reach the server. Check your internet connection.',
-      );
+      throw const ApiException('Unable to reach the server.');
     }
   }
 
-  Map<String, dynamic> _decodeResponse(http.Response response) {
+  static Map<String, dynamic> _decodeResponse(http.Response response) {
     if (response.body.trim().isEmpty) {
       throw const ApiException('Server returned an empty response.');
     }
+
+    print('RAW SERVER RESPONSE: ${response.body}');
 
     dynamic decodedBody;
     try {
@@ -188,7 +230,7 @@ class ApiService {
     return decodedBody;
   }
 
-  void _throwIfRequestFailed(
+  static void _throwIfRequestFailed(
     Map<String, dynamic> jsonMap, {
     required String fallbackMessage,
   }) {
@@ -202,7 +244,7 @@ class ApiService {
     throw ApiException(message);
   }
 
-  bool _isSuccess(Map<String, dynamic> jsonMap) {
+  static bool _isSuccess(Map<String, dynamic> jsonMap) {
     final value = jsonMap['success'];
     if (value is bool) {
       return value;
@@ -217,7 +259,7 @@ class ApiService {
     return false;
   }
 
-  String? _extractString(Map<String, dynamic> jsonMap, List<String> keys) {
+  static String? _extractString(Map<String, dynamic> jsonMap, List<String> keys) {
     for (final key in keys) {
       final value = jsonMap[key];
       if (value == null) {

@@ -12,11 +12,7 @@ class EditMonstersPage extends StatefulWidget {
 }
 
 class _EditMonstersPageState extends State<EditMonstersPage> {
-  final _apiService = ApiService();
-
-  List<MonsterModel> _monsters = const [];
-  bool _isLoading = true;
-  String? _errorMessage;
+  late Future<List<MonsterModel>> _monstersFuture;
 
   @override
   void initState() {
@@ -24,203 +20,104 @@ class _EditMonstersPageState extends State<EditMonstersPage> {
     _loadMonsters();
   }
 
-  Future<void> _loadMonsters() async {
+  void _loadMonsters() {
+    _monstersFuture = ApiService.getMonsters();
+  }
+
+  Future<void> _refresh() async {
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+      _loadMonsters();
     });
-
-    try {
-      final monsters = await _apiService.getMonsters();
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _monsters = monsters;
-        _isLoading = false;
-      });
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-        _errorMessage = _formatError(error);
-      });
-    }
   }
 
-  Future<void> _openEditMonster(MonsterModel monster) async {
-    final updated = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => EditMonsterPage(monster: monster)),
+  Future<void> _openEdit(MonsterModel monster) async {
+    final updated = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditMonsterPage(monster: monster),
+      ),
     );
-
-    if (updated == true && mounted) {
-      await _loadMonsters();
+    if (updated == true) {
+      _refresh();
     }
-  }
-
-  String _formatError(Object error) {
-    if (error is ApiException) {
-      return error.message;
-    }
-    return error.toString().replaceFirst('Exception: ', '');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Monsters'),
-        actions: [
-          IconButton(
-            onPressed: _isLoading ? null : _loadMonsters,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+        title: const Text("Edit Monsters"),
       ),
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
-            ? _ErrorState(message: _errorMessage!, onRetry: _loadMonsters)
-            : _monsters.isEmpty
-            ? _EmptyState(
-                title: 'No monsters found',
-                subtitle: 'Add a monster first, then return here to edit it.',
-                onRefresh: _loadMonsters,
-              )
-            : RefreshIndicator(
-                onRefresh: _loadMonsters,
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: _monsters.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final monster = _monsters[index];
-                    return Card(
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(14),
-                        leading: _MonsterListImage(
-                          pictureUrl: monster.pictureUrl,
-                        ),
-                        title: Text(
-                          monster.monsterName,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            '${monster.monsterType}\n'
-                            'Lat: ${monster.spawnLatitude.toStringAsFixed(5)}\n'
-                            'Lng: ${monster.spawnLongitude.toStringAsFixed(5)}\n'
-                            'Radius: ${monster.spawnRadiusMeters.toStringAsFixed(1)} m',
+      body: FutureBuilder<List<MonsterModel>>(
+        future: _monstersFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text("Error: ${snapshot.error}"),
+            );
+          }
+
+          final monsters = snapshot.data ?? [];
+
+          if (monsters.isEmpty) {
+            return const Center(
+              child: Text("No monsters found"),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView.builder(
+              itemCount: monsters.length,
+              itemBuilder: (context, index) {
+                final monster = monsters[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  child: ListTile(
+                    leading: monster.pictureUrl != null &&
+                            monster.pictureUrl!.isNotEmpty
+                        ? CircleAvatar(
+                            backgroundImage: NetworkImage(monster.pictureUrl!),
+                          )
+                        : const CircleAvatar(
+                            child: Icon(Icons.image_not_supported),
                           ),
+                    title: Text(monster.monsterName),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Type: ${monster.monsterType}"),
+                        Text(
+                          "Lat: ${monster.spawnLatitude.toStringAsFixed(7)}",
                         ),
-                        isThreeLine: true,
-                        trailing: FilledButton(
-                          onPressed: () => _openEditMonster(monster),
-                          child: const Text('Edit'),
+                        Text(
+                          "Lng: ${monster.spawnLongitude.toStringAsFixed(7)}",
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-      ),
-    );
-  }
-}
-
-class _MonsterListImage extends StatelessWidget {
-  const _MonsterListImage({this.pictureUrl});
-
-  final String? pictureUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final resolvedUrl = ApiService.resolveImageUrl(pictureUrl);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 72,
-        height: 72,
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: resolvedUrl == null
-            ? const Icon(Icons.image_not_supported_outlined)
-            : Image.network(
-                resolvedUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    const Icon(Icons.broken_image_outlined),
-              ),
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 44),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.title,
-    required this.subtitle,
-    required this.onRefresh,
-  });
-
-  final String title;
-  final String subtitle;
-  final Future<void> Function() onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.pets_outlined, size: 44),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
+                        Text(
+                          "Radius: ${monster.spawnRadiusMeters.toStringAsFixed(2)} m",
+                        ),
+                      ],
+                    ),
+                    isThreeLine: true,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _openEdit(monster),
+                    ),
+                  ),
+                );
+              },
             ),
-            const SizedBox(height: 8),
-            Text(subtitle, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            OutlinedButton(onPressed: onRefresh, child: const Text('Refresh')),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

@@ -24,7 +24,6 @@ class _EditMonsterPageState extends State<EditMonsterPage> {
   final _typeController = TextEditingController();
   final _radiusController = TextEditingController();
   final _mapController = MapController();
-  final _apiService = ApiService();
   final _imagePicker = ImagePicker();
 
   late final LatLng _initialPoint;
@@ -101,10 +100,11 @@ class _EditMonsterPageState extends State<EditMonsterPage> {
     try {
       String? pictureUrl = widget.monster.pictureUrl;
       if (_selectedImage != null) {
-        pictureUrl = await _apiService.uploadMonsterImage(_selectedImage!);
+        pictureUrl = await ApiService.uploadMonsterImage(_selectedImage!);
       }
 
-      final updatedMonster = widget.monster.copyWith(
+      await ApiService.updateMonster(
+        monsterId: widget.monster.monsterId,
         monsterName: _nameController.text.trim(),
         monsterType: _typeController.text.trim(),
         spawnLatitude: _selectedPoint.latitude,
@@ -112,8 +112,6 @@ class _EditMonsterPageState extends State<EditMonsterPage> {
         spawnRadiusMeters: _radiusValue,
         pictureUrl: pictureUrl,
       );
-
-      await _apiService.updateMonster(updatedMonster);
 
       if (!mounted) {
         return;
