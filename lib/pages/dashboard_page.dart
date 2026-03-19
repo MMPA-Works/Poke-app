@@ -49,7 +49,7 @@ class DashboardPage extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final crossAxisCount = constraints.maxWidth >= 620 ? 2 : 1;
-            final childAspectRatio = crossAxisCount == 2 ? 1.35 : 2.1;
+            final childAspectRatio = crossAxisCount == 2 ? 1.35 : 1.5;
 
             return Padding(
               padding: const EdgeInsets.all(16),
@@ -150,6 +150,8 @@ class _DashboardCard extends StatelessWidget {
               Text(
                 action.description,
                 style: Theme.of(context).textTheme.bodyMedium,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
