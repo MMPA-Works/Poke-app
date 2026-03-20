@@ -4,6 +4,8 @@ import 'add_monster_page.dart';
 import 'delete_monster_page.dart';
 import 'edit_monsters_page.dart';
 import 'map_page.dart';
+import 'catch_monster_page.dart';
+import 'display_ranking_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -38,6 +40,22 @@ class DashboardPage extends StatelessWidget {
         icon: Icons.map_outlined,
         color: const Color(0xFF6A1B9A),
         destinationBuilder: (_) => const MapPage(),
+      ),
+      // NEW: Catch Monsters Action
+      _DashboardAction(
+        title: 'Catch Monsters',
+        description: 'Find and catch monsters near your physical location.',
+        icon: Icons.track_changes,
+        color: const Color(0xFFE65100),
+        destinationBuilder: (_) => const CatchMonsterPage(),
+      ),
+      // NEW: Leaderboard Action
+      _DashboardAction(
+        title: 'View Top Monster Hunters',
+        description: 'See the leaderboard of players with the most catches.',
+        icon: Icons.emoji_events_outlined,
+        color: const Color(0xFFF57F17),
+        destinationBuilder: (_) => const DisplayRankingPage(),
       ),
     ];
 
@@ -78,7 +96,7 @@ class DashboardPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Manage monsters, adjust spawn points, and verify the map in one place.',
+                          'Manage monsters, catch them in the wild, and check the leaderboards.',
                           style: textTheme.headlineSmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
