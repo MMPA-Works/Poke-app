@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'pages/dashboard_page.dart';
+import 'pages/login_page.dart'; // Changed to import the login page
 
 void main() {
   runApp(const HAUMonstersApp());
@@ -33,7 +33,8 @@ class HAUMonstersApp extends StatelessWidget {
           behavior: SnackBarBehavior.floating,
         ),
       ),
-      home: const DashboardPage(),
+      // Set the home page to LoginPage so players must log in
+      home: const LoginPage(), 
     );
   }
 }

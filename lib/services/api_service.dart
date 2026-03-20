@@ -6,15 +6,49 @@ import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 import '../models/monster_model.dart';
-// Note: You will need to create this model file if you have not already.
 import '../models/player_ranking_model.dart';
 
 class ApiService {
   static final http.Client _client = http.Client();
   static const Duration _timeout = Duration(seconds: 20);
 
-  // Keeping your robust AppConfig setup
   static String get baseUrl => AppConfig.apiBaseUrl;
+
+  static Future<Map<String, dynamic>> registerPlayer(
+      String name, String username, String password) async {
+    return await _postJson(
+      endpoint: 'register_player.php',
+      body: {
+        'player_name': name,
+        'username': username,
+        'password': password,
+      },
+    );
+  }
+
+  static Future<Map<String, dynamic>> loginPlayer(
+      String username, String password) async {
+    return await _postJson(
+      endpoint: 'login_player.php',
+      body: {
+        'username': username,
+        'password': password,
+      },
+    );
+  }
+
+  static Future<Map<String, dynamic>> catchMonster(
+      int playerId, int monsterId, double latitude, double longitude) async {
+    return await _postJson(
+      endpoint: 'catch_monster.php',
+      body: {
+        'player_id': playerId,
+        'monster_id': monsterId,
+        'latitude': latitude,
+        'longitude': longitude,
+      },
+    );
+  }
 
   static Future<Map<String, dynamic>> addMonster({
     required String monsterName,
@@ -181,7 +215,8 @@ class ApiService {
     return '$baseUrl/$trimmed';
   }
 
-  // Changed this helper to send JSON instead of form data
+  // --- INTERNAL HELPERS ---
+
   static Future<Map<String, dynamic>> _postJson({
     required String endpoint,
     required Map<String, dynamic> body,

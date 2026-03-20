@@ -9,8 +9,10 @@ class PlayerRanking {
 
   factory PlayerRanking.fromJson(Map<String, dynamic> json) {
     return PlayerRanking(
-      playerName: json['player_name']?.toString() ?? "Unknown",
-      monstersCaught: int.tryParse(json['monsters_caught'].toString()) ?? 0,
+      playerName: json['player_name'] ?? 'Unknown',
+      monstersCaught: json['monsters_caught'] is int
+          ? json['monsters_caught']
+          : int.parse(json['monsters_caught'].toString()),
     );
   }
 }
