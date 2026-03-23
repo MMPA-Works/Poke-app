@@ -8,11 +8,11 @@ class PlayerRanking {
   });
 
   factory PlayerRanking.fromJson(Map<String, dynamic> json) {
+    final catches = json['monsters_caught'] ?? json['total_catches'] ?? 0;
+
     return PlayerRanking(
       playerName: json['player_name'] ?? 'Unknown',
-      monstersCaught: json['monsters_caught'] is int
-          ? json['monsters_caught']
-          : int.parse(json['monsters_caught'].toString()),
+      monstersCaught: catches is int ? catches : int.parse(catches.toString()),
     );
   }
 }

@@ -22,6 +22,8 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   List<MonsterModel> _monsters = [];
+  List<Map<String, dynamic>> _locations = [];
+  int? _selectedLocationId;
   LatLng? _currentLocation;
   bool _isLoading = true;
   bool _isDetecting = false;
@@ -39,8 +41,27 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
   }
 
   Future<void> _initializeData() async {
+    await _loadLocations(); // Fetch locations first
     await _loadMonsters();
     await _updateCurrentLocation();
+  }
+
+  // Fetch locations from the database to populate the dropdown
+  Future<void> _loadLocations() async {
+    try {
+      final locations = await ApiService.getLocations();
+      if (mounted) {
+        setState(() {
+          _locations = locations;
+          if (_locations.isNotEmpty) {
+            // Set the first location as the default selected item
+            _selectedLocationId = int.tryParse(_locations.first['location_id'].toString());
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load locations: $e');
+    }
   }
 
   Future<void> _loadMonsters() async {
@@ -74,7 +95,6 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
         }
       }
 
-      // Using desiredAccuracy to maintain compatibility with your geolocator version
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -95,7 +115,6 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
     }
   }
 
-  // --- CORE EXAM REQUIREMENT: DISTANCE & HARDWARE TRIGGER ---
   Future<void> _detectMonsters() async {
     if (_currentLocation == null) {
       await _updateCurrentLocation();
@@ -107,7 +126,6 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
     MonsterModel? nearestMonster;
     double minDistance = double.infinity;
 
-    // 1. Geolocator distance calculation
     for (var monster in _monsters) {
       double distance = Geolocator.distanceBetween(
         _currentLocation!.latitude,
@@ -125,10 +143,7 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
     setState(() => _isDetecting = false);
 
     if (nearestMonster != null) {
-      // 2. Trigger Hardware (Audio & Flashlight)
       _triggerHardwareAlert();
-
-      // 3. Show Catch Dialog
       _showCatchDialog(nearestMonster, minDistance);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -138,14 +153,12 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
   }
 
   Future<void> _triggerHardwareAlert() async {
-    // Play Alarm Sound
     try {
       await _audioPlayer.play(AssetSource('sounds/monster_alarm.wav'));
     } catch (e) {
       debugPrint('Audio error: $e');
     }
 
-    // Flashlight Logic (5 seconds = 5 loops of 1 second)
     try {
       bool hasTorch = await TorchLight.isTorchAvailable();
       if (hasTorch) {
@@ -173,7 +186,7 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
         actions: [
           TextButton(
             onPressed: () {
-              _audioPlayer.stop(); // Stop sound if they cancel early
+              _audioPlayer.stop();
               Navigator.pop(context);
             },
             child: const Text('Run Away'),
@@ -198,12 +211,21 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
       return;
     }
 
-    // Stop audio just in case it is still playing
+    // Require the user to pick a location before catching
+    if (_selectedLocationId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Please select your current location from the dropdown!')),
+      );
+      return;
+    }
+
     _audioPlayer.stop();
 
+    // Pass the selected Location ID to the API
     final result = await ApiService.catchMonster(
       UserSession.playerId!,
       monster.monsterId,
+      _selectedLocationId!,
       _currentLocation!.latitude,
       _currentLocation!.longitude,
     );
@@ -245,7 +267,6 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.example.haumonsters',
                       ),
-                      // Monster Spawn Radiuses
                       CircleLayer(
                         circles: _monsters
                             .map(
@@ -263,10 +284,8 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
                             )
                             .toList(),
                       ),
-                      // Markers
                       MarkerLayer(
                         markers: [
-                          // Player Location Marker
                           if (_currentLocation != null)
                             Marker(
                               point: _currentLocation!,
@@ -278,7 +297,6 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
                                 size: 40,
                               ),
                             ),
-                          // Monster Markers
                           ..._monsters.map(
                             (m) => Marker(
                               point: LatLng(m.spawnLatitude, m.spawnLongitude),
@@ -296,12 +314,34 @@ class _CatchMonsterPageState extends State<CatchMonsterPage> {
                     ],
                   ),
                 ),
-                // Bottom Control Panel matching the exam wireframe
                 Container(
                   padding: const EdgeInsets.all(16.0),
                   color: Theme.of(context).colorScheme.surface,
                   child: Column(
                     children: [
+                      // Dropdown menu for selecting the HAU location
+                      if (_locations.isNotEmpty) ...[
+                        DropdownButtonFormField<int>(
+                          value: _selectedLocationId,
+                          decoration: const InputDecoration(
+                            labelText: "Select Current Location",
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          items: _locations.map((loc) {
+                            return DropdownMenuItem<int>(
+                              value: int.tryParse(loc['location_id'].toString()),
+                              child: Text(loc['location_name'].toString()),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedLocationId = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       if (_currentLocation != null) ...[
                         Text(
                           'Your Latitude: ${_currentLocation!.latitude}',
