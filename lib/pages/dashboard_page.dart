@@ -7,6 +7,7 @@ import 'delete_monster_page.dart';
 import 'display_ranking_page.dart';
 import 'edit_monsters_page.dart';
 import 'map_page.dart';
+import 'add_location_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -61,6 +62,14 @@ class DashboardPage extends StatelessWidget {
         color: const Color(0xFFC89B17),
         surfaceColor: const Color(0xFFFFF7DE),
         destinationBuilder: (_) => const DisplayRankingPage(),
+      ),
+      _DashboardAction(
+        title: 'Add Location',
+        description: 'Register HAU campus buildings (PGN, SJH) using GPS.',
+        icon: Icons.add_location_alt_outlined,
+        color: const Color(0xFF00ACC1), // Cyan theme
+        surfaceColor: const Color(0xFFE0F7FA),
+        destinationBuilder: (_) => const AddLocationPage(),
       ),
     ];
 
