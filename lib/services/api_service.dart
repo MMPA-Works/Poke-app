@@ -54,6 +54,7 @@ class ApiService {
     );
   }
 
+  // NOTE: This is the ONLY getPlayerRankings method now.
   static Future<List<PlayerRanking>> getPlayerRankings() async {
     try {
       final response = await _client
@@ -115,6 +116,57 @@ class ApiService {
     } catch (e) {
       return [];
     }
+  }
+
+  // RESTORED METHOD
+  static Future<List<MonsterModel>> getMonsters() async {
+    try {
+      final response = await _client
+          .get(Uri.parse('$baseUrl/get_monsters.php'))
+          .timeout(_timeout);
+
+      final jsonMap = _decodeResponse(response);
+      _throwIfRequestFailed(jsonMap, fallbackMessage: 'Failed to load monsters.');
+
+      final data = jsonMap['data'];
+      if (data is! List) {
+        throw const ApiException('Invalid monster list received from the server.');
+      }
+
+      return data
+          .whereType<Map>()
+          .map((item) => MonsterModel.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } on TimeoutException {
+      throw const ApiException('Request timed out while loading monsters.');
+    } on SocketException {
+      throw const ApiException('Unable to reach the server.');
+    }
+  }
+
+  // RESTORED METHOD
+  static Future<Map<String, dynamic>> addMonster({
+    required String monsterName,
+    required String monsterType,
+    required double spawnLatitude,
+    required double spawnLongitude,
+    required double spawnRadiusMeters,
+    String? pictureUrl,
+  }) async {
+    final jsonMap = await _postJson(
+      endpoint: 'add_monster.php',
+      body: {
+        "monster_name": monsterName,
+        "monster_type": monsterType,
+        "spawn_latitude": spawnLatitude,
+        "spawn_longitude": spawnLongitude,
+        "spawn_radius_meters": spawnRadiusMeters,
+        "picture_url": pictureUrl ?? "",
+      },
+    );
+
+    _throwIfRequestFailed(jsonMap, fallbackMessage: 'Failed to add monster.');
+    return jsonMap;
   }
 
   static Future<Map<String, dynamic>> updateMonster({
@@ -196,38 +248,6 @@ class ApiService {
       throw const ApiException('Image upload timed out.');
     } on SocketException {
       throw const ApiException('Unable to reach the server for image upload.');
-    }
-  }
-
-  static Future<List<PlayerRanking>> getPlayerRankings() async {
-    try {
-      final response = await _client
-          .get(Uri.parse('$baseUrl/get_player_rankings.php'))
-          .timeout(_timeout);
-
-      final jsonMap = _decodeResponse(response);
-      _throwIfRequestFailed(
-        jsonMap,
-        fallbackMessage: 'Failed to load rankings.',
-      );
-
-      final data = jsonMap['data'];
-      if (data is! List) {
-        throw const ApiException(
-          'Invalid ranking list received from the server.',
-        );
-      }
-
-      return data
-          .whereType<Map>()
-          .map(
-            (item) => PlayerRanking.fromJson(Map<String, dynamic>.from(item)),
-          )
-          .toList();
-    } on TimeoutException {
-      throw const ApiException('Request timed out while loading rankings.');
-    } on SocketException {
-      throw const ApiException('Unable to reach the server.');
     }
   }
 
