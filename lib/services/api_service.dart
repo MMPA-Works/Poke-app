@@ -58,7 +58,7 @@ class ApiService {
   static Future<List<PlayerRanking>> getPlayerRankings() async {
     try {
       final response = await _client
-          .get(Uri.parse('$baseUrl/top_monter_hunters.php'))
+          .get(Uri.parse('$baseUrl/top_monster_hunters.php'))
           .timeout(_timeout);
 
       final jsonMap = _decodeResponse(response);
